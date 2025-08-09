@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* ChatGPT Dark Theme - Primary Palette */
+    --background: 0 0% 5.1%; /* #0d0d0d */
+    --foreground: 0 0% 98%; /* Almost white */
+
+    --card: 0 0% 8%; /* #141414 */
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 6%; /* #0f0f0f */
+    --popover-foreground: 0 0% 98%;
+
+    /* ChatGPT Green Accent */
+    --primary: 160 77% 33%; /* #10a37f */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 12%; /* #1f1f1f */
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 10%; /* #1a1a1a */
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 160 77% 33%; /* Same as primary for consistency */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 15%; /* #262626 */
+    --input: 0 0% 12%; /* #1f1f1f */
+    --ring: 160 77% 33%; /* ChatGPT green */
+
+    --radius: 0.75rem;
+
+    /* Vectra PDF Specific Colors */
+    --vectra-dark: 0 0% 3%; /* Ultra dark background */
+    --vectra-surface: 0 0% 8%; /* Card surfaces */
+    --vectra-border: 0 0% 20%; /* Subtle borders */
+    --vectra-text-primary: 0 0% 95%; /* Primary text */
+    --vectra-text-secondary: 0 0% 70%; /* Secondary text */
+    --vectra-green: 160 77% 33%; /* ChatGPT green */
+    --vectra-green-hover: 160 77% 28%; /* Darker green on hover */
+    --vectra-green-light: 160 77% 45%; /* Lighter green variant */
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(160 77% 33%), hsl(160 77% 45%));
+    --gradient-surface: linear-gradient(145deg, hsl(0 0% 6%), hsl(0 0% 10%));
+    --gradient-border: linear-gradient(145deg, hsl(0 0% 15%), hsl(0 0% 20%));
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* Sidebar (keeping for compatibility) */
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 160 77% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 160 77% 33%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background: hsl(var(--vectra-dark));
+    min-height: 100vh;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Interactive hover effects */
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-lg hover:shadow-primary/20;
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background: hsl(var(--vectra-surface) / 0.8);
+    border: 1px solid hsl(var(--vectra-border) / 0.3);
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Animated underline */
+  .link-underline {
+    @apply relative;
+  }
+  
+  .link-underline::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300;
+  }
+  
+  .link-underline:hover::after {
+    @apply w-full;
+  }
+}
