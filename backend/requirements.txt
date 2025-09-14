@@ -27,8 +27,6 @@ langchain==0.3.27
     # via persona-driven-document-intelligence-engine (pyproject.toml)
 langchain-community==0.3.29
     # via persona-driven-document-intelligence-engine (pyproject.toml)
-langchain-core==0.3.29
-    # pulled in by langchain / langchain-community
 langchain-groq==0.3.7
     # via persona-driven-document-intelligence-engine (pyproject.toml)
 packaging==24.2
