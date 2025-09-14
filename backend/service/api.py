@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Query
 from typing import List
-from RAG.vectordb import VectorDB, Retriever
-from RAG.rag_system import RAGSystem
+from service.RAG.vectordb import VectorDB, Retriever
+from service.RAG.rag_system import RAGSystem
 from dotenv import load_dotenv
 import shutil
 import os
@@ -129,7 +129,7 @@ async def search_chat_endpoint(query: str, chat_id: str):
         # Ensure list response
         if isinstance(results, str):
             results = [results]
-
+        print(results)
         return results
 
 

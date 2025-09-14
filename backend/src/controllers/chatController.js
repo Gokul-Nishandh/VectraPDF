@@ -149,7 +149,7 @@ exports.searchChat = async (req, res) => {
     );
 
     const searchResults = fastApiSearchResponse.data;
-
+    console.log(searchResults);
    // 2. Format results
 const formattedResults = searchResults.map((item, idx) => {
   let text = "";
