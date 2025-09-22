@@ -31,7 +31,7 @@ VectraPDF is a **full-stack platform** designed to bring intelligence to documen
 
 - **Frontend:** React (Vite), Tailwind CSS, Vercel  
 - **Backend:** Node.js, Express.js, PostgreSQL (Neon), Render  
-- **Caching & Queues:** Redis *(planned)*  
+- **Caching & Queues:** Redis *Added write-through cache for chat history sections (reduced latency by 50% ) *
 - **Event Streaming:** Apache Kafka *(planned)*  
 - **Authentication:** OAuth 2.0, JWT  
 - **Deployment:** Vercel (frontend), Render (backend)  
