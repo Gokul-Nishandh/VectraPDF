@@ -25,7 +25,6 @@ CREATE TABLE "public"."Chat" (
 CREATE TABLE "public"."Pdf" (
     "pdfId" SERIAL NOT NULL,
     "chatId" INTEGER NOT NULL,
-    "pdf" BYTEA NOT NULL,
     "fileName" TEXT,
 
     CONSTRAINT "Pdf_pkey" PRIMARY KEY ("pdfId")

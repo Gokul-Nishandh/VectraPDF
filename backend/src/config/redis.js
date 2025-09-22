@@ -1,12 +1,9 @@
-const Redis = require("ioredis");
+// Upstash Redis
+const { Redis } = require('@upstash/redis');
 
 const redis = new Redis({
-    host : process.env.REDIS_HOST || "127.0.0.1",
-    port : process.env.REDIS_PORT || 6379,
-    password : process.env.REDIS_PASSWORD || undefined ,
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
-
-redis.on("connect",()=>console.log("Connected to Redis"));
-redis.on("error",(err)=>console.error("Redis error : ",err));
 
 module.exports = redis;
