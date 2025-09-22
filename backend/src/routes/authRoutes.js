@@ -12,7 +12,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
 // Email/Password
 router.post("/signup", authController.signup);
 router.post("/login", authController.login);
-router.post("/logout", authController.logout);
+router.post("/logout", authMiddleware, authController.logout);
 // Google OAuth
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 

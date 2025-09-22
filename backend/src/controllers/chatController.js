@@ -1,8 +1,22 @@
 const prisma = require('../config/db');
 const axios = require('axios');
 const FormData = require('form-data');
+const redis=require("../config/redis");
 
-// ------------------ Upload PDFs ------------------
+
+// ---------------- Cache Helpers ----------------
+async function invalidateUserCache(userId) {
+  const cacheKey = `user:${userId}:chats`;
+  await redis.del(cacheKey);
+  await redis.set(`user:${userId}:dirty`, "true"); // mark dirty for write-back
+}
+
+// Write chats to cache and mark dirty
+async function writeUserCache(userId, chats) {
+  const cacheKey = `user:${userId}:chats`;
+  await redis.set(cacheKey, JSON.stringify(chats), "EX", 60 * 5); // 5 min TTL
+  await redis.set(`user:${userId}:dirty`, "true");
+}
 // ------------------ Upload PDFs ------------------
 exports.uploadPdf = async (req, res) => {
   try {
@@ -77,6 +91,13 @@ if (filesToDelete.length > 0) {
         fileName: file.originalname,
       }));
       await prisma.pdf.createMany({ data: pdfData });
+      // After prisma.pdf.createMany(...)
+const updatedChats = await prisma.chat.findMany({
+  where: { userId },
+  include: { pdfs: { select: { pdfId: true, fileName: true } } },
+  orderBy: { chatId: "desc" },
+});
+await writeUserCache(userId, updatedChats);
 
       // Forward only new files to FastAPI
       const formData = new FormData();
@@ -155,8 +176,15 @@ const formattedResults = searchResults.map((item, idx) => {
   let text = "";
 
   try {
-    const parsed = typeof item === "string" ? JSON.parse(item) : item;
-    text = parsed.page_content || "";
+    // ✅ only parse if item looks like JSON
+    if (typeof item === "string" && item.trim().startsWith("{")) {
+      const parsed = JSON.parse(item);
+      text = parsed.page_content || "";
+    } else if (typeof item === "object") {
+      text = item.page_content || "";
+    } else {
+      text = String(item);
+    }
   } catch (err) {
     console.error("Failed to parse search result:", item, err);
     text = typeof item === "string" ? item : "";
@@ -167,6 +195,7 @@ const formattedResults = searchResults.map((item, idx) => {
     text: text.replace(/\n+/g, "\n").trim(),
   };
 });
+
 
 // 🔥 Merge results into one string for saving
 const mergedText = formattedResults.map(r => r.text).join("\n\n");
@@ -187,6 +216,14 @@ await prisma.chat.update({
   data: { insights: mergedText, persona },
 });
 
+// Update cache
+const updatedChats = await prisma.chat.findMany({
+  where: { userId: chat.userId },
+  include: { pdfs: { select: { pdfId: true, fileName: true } } },
+  orderBy: { chatId: "desc" },
+});
+await writeUserCache(chat.userId, updatedChats);
+
 return res.status(200).json({
   chatId,
   persona,
@@ -200,67 +237,81 @@ return res.status(200).json({
   }
 };
 
-
-// ------------------ Get Chats by User ------------------
 exports.getChatsByUser = async (req, res) => {
+  const startTime = Date.now();
   try {
     const userId = req.user.id;
+    const cacheKey = `user:${userId}:chats`;
+
+    const cachedChats = await redis.get(cacheKey);
+    if (cachedChats) {
+      const endTime = Date.now();
+      console.log(`✅ Cache hit | getChatsByUser: ${endTime - startTime} ms`);
+      return res.status(200).json({ chats: JSON.parse(cachedChats), fromCache: true });
+    }
+
     const chats = await prisma.chat.findMany({
       where: { userId },
-      include: { pdfs: true },
+      include: { pdfs: { select: { pdfId: true, fileName: true } } },
+      orderBy: { chatId: "desc" },
     });
-    if (!chats || chats.length === 0) {
-      // Return 200 with empty chats array
-      return res.status(200).json({ chats: [], message: 'No chat history found.' });
-    }
-    return res.status(200).json({ chats });
+
+    await redis.set(cacheKey, JSON.stringify(chats), "EX", 60 * 5);
+    await redis.set(`user:${userId}:dirty`, "false"); // cache is clean
+
+    const endTime = Date.now();
+    console.log(`❌ Cache miss | getChatsByUser: ${endTime - startTime} ms`);
+
+    return res.status(200).json({ chats, fromCache: false });
   } catch (error) {
-    console.error('Error fetching chats:', error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error("Error fetching chats:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
 
+exports.startNewChat = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const newChat = await prisma.chat.create({ data: { userId } });
+
+    // Write latest chats to Redis + mark dirty
+    const chats = await prisma.chat.findMany({
+      where: { userId },
+      include: { pdfs: { select: { pdfId: true, fileName: true } } },
+      orderBy: { chatId: "desc" },
+    });
+    await writeUserCache(userId, chats);
+
+    return res.status(201).json({ message: "New chat started", chatId: newChat.chatId });
+  } catch (error) {
+    console.error("Error in startNewChat:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
 
 // ------------------ Delete Chat ------------------
 exports.deleteChat = async (req, res) => {
   try {
     const { chatId } = req.params;
-    if (!chatId) {
-      return res.status(400).json({ error: 'chatId is required' });
-    }
+    if (!chatId) return res.status(400).json({ error: "chatId is required" });
 
-    // 1. Get PDFs associated with this chat
-    const pdfs = await prisma.pdf.findMany({
-      where: { chatId: Number(chatId) },
+    const chat = await prisma.chat.findUnique({ where: { chatId: Number(chatId) } });
+    if (!chat) return res.status(404).json({ error: `Chat ${chatId} not found.` });
+
+    await prisma.chat.delete({ where: { chatId: Number(chatId) } });
+
+    // Update Redis cache + mark dirty
+    const chats = await prisma.chat.findMany({
+      where: { userId: chat.userId },
+      include: { pdfs: { select: { pdfId: true, fileName: true } } },
+      orderBy: { chatId: "desc" },
     });
+    await writeUserCache(chat.userId, chats);
 
-    // 2. Delete local PDF files (if you are saving them in filesystem with fileName)
-    
-    // 3. Delete from Postgres (cascade removes PDFs too)
-    // 3. Delete from Postgres (cascade removes PDFs too)
-const chat = await prisma.chat.findUnique({
-  where: { chatId: Number(chatId) },
-});
-
-if (!chat) {
-  return res.status(404).json({ error: `Chat ${chatId} not found.` });
-}
-
-await prisma.chat.delete({
-  where: { chatId: Number(chatId) },
-});
-
-    // 4. Call FastAPI to delete from Pinecone
-    await axios.delete(process.env.FAST_API_URL+'/delete-chat', {
-      params: { chat_id: chatId },
-    });
-
-    return res.status(200).json({
-      message: `Chat ${chatId} deleted from Postgres, Pinecone, and local storage.`,
-    });
-
+    return res.status(200).json({ message: `Chat ${chatId} deleted and cache invalidated.` });
   } catch (error) {
     console.error("Error in deleteChat:", error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
